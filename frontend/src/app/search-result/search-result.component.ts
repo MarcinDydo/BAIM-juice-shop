@@ -13,6 +13,7 @@ import { forkJoin, type Subscription } from 'rxjs'
 import { MatTableDataSource } from '@angular/material/table'
 import { MatDialog } from '@angular/material/dialog'
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser'
+import { SecurityContext } from '@angular/core';
 import { TranslateService, TranslateModule } from '@ngx-translate/core'
 import { SocketIoService } from '../Services/socket-io.service'
 import { SnackBarHelperService } from '../Services/snack-bar-helper.service'
@@ -54,7 +55,7 @@ export class SearchResultComponent implements OnDestroy, AfterViewInit {
   public pageSizeOptions: number[] = []
   public dataSource!: MatTableDataSource<TableEntry>
   public gridDataSource!: any
-  public searchValue?: SafeHtml
+  public searchValue?: string | null;
   public resultsLength = 0
   @ViewChild(MatPaginator, { static: true }) paginator: MatPaginator | null = null
   private readonly productSubscription?: Subscription
@@ -98,7 +99,9 @@ export class SearchResultComponent implements OnDestroy, AfterViewInit {
       for (let i = 1; i <= Math.ceil(this.dataSource.data.length / 12); i++) {
         this.pageSizeOptions.push(i * 12)
       }
-      this.paginator.pageSizeOptions = this.pageSizeOptions
+      if (this.paginator) {
+        this.paginator.pageSizeOptions = this.pageSizeOptions;
+      }
       this.dataSource.paginator = this.paginator
       this.gridDataSource = this.dataSource.connect()
       this.resultsLength = this.dataSource.data.length
@@ -130,7 +133,7 @@ export class SearchResultComponent implements OnDestroy, AfterViewInit {
 
   trustProductDescription (tableData: any[]) { // vuln-code-snippet neutral-line restfulXssChallenge
     for (let i = 0; i < tableData.length; i++) { // vuln-code-snippet neutral-line restfulXssChallenge
-      tableData[i].description = this.sanitizer.bypassSecurityTrustHtml(tableData[i].description) // vuln-code-snippet vuln-line restfulXssChallenge
+      tableData[i].description = this.sanitizer.sanitize(SecurityContext.HTML,tableData[i].description)// vuln-code-snippet vuln-line restfulXssChallenge
     } // vuln-code-snippet neutral-line restfulXssChallenge
   } // vuln-code-snippet neutral-line restfulXssChallenge
   // vuln-code-snippet end restfulXssChallenge
@@ -156,7 +159,7 @@ export class SearchResultComponent implements OnDestroy, AfterViewInit {
         this.io.socket().emit('verifyLocalXssChallenge', queryParam)
       }) // vuln-code-snippet hide-end
       this.dataSource.filter = queryParam.toLowerCase()
-      this.searchValue = this.sanitizer.bypassSecurityTrustHtml(queryParam) // vuln-code-snippet vuln-line localXssChallenge xssBonusChallenge
+      this.searchValue = this.sanitizer.sanitize(SecurityContext.URL,queryParam) // vuln-code-snippet vuln-line localXssChallenge xssBonusChallenge
       this.gridDataSource.subscribe((result: any) => {
         if (result.length === 0) {
           this.emptyState = true
