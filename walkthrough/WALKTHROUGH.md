@@ -107,4 +107,21 @@ const id = typeof req.body.id === 'string'
     : null;
     if (!id) throw new Error('Invalid id')
 ```
-###
+### SQL injection w parametrze search query
+podatna końcówka GET /rest/products/search?q=
+
+za pomocą złośliwie przygotowanego query można wykonać UNION Based SQL injection i wylistować wszystkich uzytkowników oraz hasze haseł:
+```
+a%')) UNION SELECT id,email as name,password as description,0 as price,0 as deluxePrice,0 as image,0 as createdAt,0 as updatedAt,0 as deletedAt FROM Users ORDER BY image; --
+```
+![POC](image-6.png)
+
+aby naprawic tę podatnośc wystarczy poprawić ten kawałek kodu:
+```
+models.sequelize.query(`SELECT * FROM Products WHERE ((name LIKE '%${criteria}%' OR description LIKE '%${criteria}%') AND deletedAt IS NULL) ORDER BY name`)
+```
+na używający podstawień od sequelize które nie sklejają bezpośrednio danych użytkownika
+
+```
+models.sequelize.query(`SELECT * FROM Products WHERE ((name LIKE ? OR description LIKE ?) AND deletedAt IS NULL) ORDER BY name`,{replacements: [ `%${criteria}%`, `%${criteria}%` ]}) 
+```

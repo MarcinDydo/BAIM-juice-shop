@@ -23,7 +23,7 @@ import { SecurityAnswerModelInit } from './securityAnswer'
 import { SecurityQuestionModelInit } from './securityQuestion'
 import { UserModelInit } from './user'
 import { WalletModelInit } from './wallet'
-import { Sequelize, Transaction } from 'sequelize'
+import { Sequelize, Transaction, QueryTypes } from 'sequelize'
 
 /* jslint node: true */
 const sequelize = new Sequelize('database', 'username', 'password', {
@@ -59,4 +59,4 @@ WalletModelInit(sequelize)
 
 relationsInit(sequelize)
 
-export { sequelize }
+export { sequelize, QueryTypes }
