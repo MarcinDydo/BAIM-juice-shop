@@ -111,13 +111,25 @@ function handleYamlUpload ({ file }: Request, res: Response, next: NextFunction)
     if (((file?.buffer) != null) && utils.isChallengeEnabled(challenges.deprecatedInterfaceChallenge)) {
       const data = file.buffer.toString()
       try {
-        const sandbox = { yaml, data }
-        vm.createContext(sandbox)
-        const yamlString = vm.runInContext('JSON.stringify(yaml.load(data))', sandbox, { timeout: 2000 })
+        const doc = yaml.load(data, {
+          schema: yaml.JSON_SCHEMA,
+          listener: (op, state) => {
+            if (state.depth > 10) {
+              throw new yaml.YAMLException('Document too deep');
+            }
+          }
+        });
+        const sandbox = { doc };
+        vm.createContext(sandbox);
+        const yamlString = vm.runInContext(
+          'JSON.stringify(doc)', 
+          sandbox,
+          { timeout: 2000 }
+        );
         res.status(410)
         next(new Error('B2B customer complaints via file upload have been deprecated for security reasons: ' + utils.trunc(yamlString, 400) + ' (' + file.originalname + ')'))
       } catch (err: any) { // TODO: Remove any
-        if (utils.contains(err.message, 'Invalid string length') || utils.contains(err.message, 'Script execution timed out')) {
+        if (utils.contains(err.message, 'Invalid string length') || utils.contains(err.message, 'Script execution timed out') || utils.contains(err.message, 'YAMLException')) {
           if (challengeUtils.notSolved(challenges.yamlBombChallenge)) {
             challengeUtils.solve(challenges.yamlBombChallenge)
           }

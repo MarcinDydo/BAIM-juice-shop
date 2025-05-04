@@ -1,4 +1,5 @@
 # Projekt BAIM - łatanie podatności juice shop-a
+Niniejszy raport opisuje identyfikację i eliminację kluczowych podatności w aplikacji OWASP Juice Shop. 
 ## XSS
 ### channalge: DOM XSS i Bonus Payload
 użycie podatej funkcji DOM sanitizer w search-result.component.ts
@@ -10,7 +11,7 @@ abstract bypassSecurityTrustHtml(value: string): SafeHtml;
      * security risks!
      */
 ```
-
+Funkcja bypassująca sanitizację HTML pozwalała na wstrzyknięcie złośliwych skryptów podczas renderowania wyników wyszukiwania.
 aby naprawić tą podatność wystarczyło dodać sanityzację parametru searchValue:
 
 ```
@@ -22,8 +23,7 @@ this.searchValue = this.sanitizer.sanitize(SecurityContext.URL,queryParam)
 ### challange: reflected XSS
 
 ![reflected xss w order history](image-3.png)
-endpoint track-result?id= jest podatny na XSS,
-pod spodem jest odpytanie /rest/track-order/ z trackOrders.ts, jest tam niesanityzowany parametr id, podatność można naprawić działając na zsanityzowanej kopii id:
+endpoint track-result?id= jest podatny na XSS. Niezsanityzowany parametr id umożliwiał wykonanie skryptu w historii zamówień. (pod spodem jest odpytanie /rest/track-order/ z trackOrders.ts, jest tam niesanityzowany parametr id) podatność można naprawić działając na zsanityzowanej kopii id:
 ```
 const sanitized = security.sanitizeSecure(req.params.id)
 ```
@@ -36,7 +36,7 @@ Za pomocą otwartego endpointu /api/products można dodawać produkty i je przeg
 curl -X POST http://localhost:3000/api/products -H "Authorization: Bearer XXXXX" --data "name=payload2&description=<em>The</em><iframe src="javascript:alert(`xss`)">&price=1.99&deluxePrice=1.99&image=banana_juice.jpg"
 ```
 ![Produkt dodał się do listy po API](image-1.png)
-
+Możliwość dodania produktu z opisem zawierającym HTML/JS, który był renderowany bez sanitizacji.
 
 ![za pomocą tego polecenia można dodać stored XSSa](image-2.png)
 
@@ -60,7 +60,7 @@ set (username: string) {
 ...
 export const sanitizeLegacy = (input = '') => input.replace(/<(?:\w+)\W+?[\w]/gi, '')
 ```
-funckja sanitize legacy pozwala na </p><p s<<p simg src="x" onerror="alert('demo')" /></img>
+Funkcja sanitizeLegacy nie usuwała wszystkich niebezpiecznych tagów, co pozwalało na wstrzyknięcie kodu w nazwie użytkownika.
 
 ### Challange: presisted XSS server side protection
 za pomocą odpowiednio spreparowanego POST na /api/Feedbacks/ możemy wymusić zamieszczenie komentarza z XSS: 
@@ -72,7 +72,7 @@ wynik:
 ```
 "status":"success","data":{"id":15,"UserId":1,"comment":"<iframe src=\"javascript:alert(`xss`)\">","rating":2,"updatedAt":"2025-04-27T22:41:47.598Z","createdAt":"2025-04-27T22:41:47.598Z"}
 ```
-
+Złośliwy payload w komentarzu był zapisywany i wykonywany na stronie /about.
 ![wykona się na stronie /about](image-5.png)
 wynika to z wykorzystania podatnej funkcji w implementacji feedback.ts która nie sanityzuje rekursywnie
 ```
@@ -198,4 +198,21 @@ let decoded = param;
 
 ![dzięki poprawce próba przeprowadzenia ataku kończy się błedem](image-7.png)
 
-###
+### Memory Bomb - yaml
+Przesłanie głęboko zagnieżdżonego dokumentu YAML powodowało zużycie zasobów.
+![wysyłając request POST /file-upload  można zużyć dużo zasobów](image-8.png)
+
+aby to naprawić wystarczy poprawić kod o limit maksymalnych zagnieżdzeń.
+```
+const doc = yaml.load(data, {
+          schema: yaml.JSON_SCHEMA,
+          listener: (op, state) => {
+            if (state.depth > 10) {
+              throw new yaml.YAMLException('Document too deep');
+            }
+          }
+        });
+```
+## Podsumowanie 
+
+W raporcie przedstawiono najczęstsze ataki XSS, injekcje NoSQL/SQL i inne luki bezpieczeństwa w OWASP Juice Shop. Dzięki prostym modyfikacjom sanitizującym dane wejściowe oraz stosowaniu bezpiecznych zapytań udało się wyeliminować krytyczne podatności.
