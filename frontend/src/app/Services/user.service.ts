@@ -6,8 +6,10 @@
 import { environment } from '../../environments/environment'
 import { Injectable } from '@angular/core'
 import { HttpClient } from '@angular/common/http'
-import { catchError, map } from 'rxjs/operators'
-import { Subject } from 'rxjs'
+import { catchError, map, switchMap } from 'rxjs/operators'
+import { Observable, Subject } from 'rxjs'
+
+const clientId = '1005568560502-6hm16lef8oh46hr2d98vf2ohlnj4nfhq.apps.googleusercontent.com'
 
 interface Passwords {
   current?: string
@@ -19,6 +21,7 @@ interface Passwords {
   providedIn: 'root'
 })
 export class UserService {
+
   public isLoggedIn = new Subject<any>()
   private readonly hostServer = environment.hostServer
   private readonly host = this.hostServer + '/api/Users'
@@ -63,8 +66,21 @@ export class UserService {
     return this.http.get(this.hostServer + '/rest/user/whoami').pipe(map((response: any) => response.user), catchError((err) => { throw err }))
   }
 
-  oauthLogin (accessToken: string) {
-    return this.http.get('https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=' + accessToken)
+  oauthLogin (params: any): Observable<any>{
+    const tokenInfoUrl = `https://oauth2.googleapis.com/tokeninfo?access_token=${params.access_token}`;
+    const userInfoUrl  = `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${params.access_token}`;
+
+    return this.http.get<{ aud: string }>(tokenInfoUrl).pipe(
+      switchMap(tokenInfo => {
+        const goodAud   = tokenInfo.aud === clientId;
+        const goodState = params.state === localStorage.getItem('oauthState');
+        if (goodAud && goodState) {
+          return this.http.get(userInfoUrl);
+        } else {
+          return this.whoAmI();
+        }
+      })
+    )
   }
 
   saveLastLoginIp () {

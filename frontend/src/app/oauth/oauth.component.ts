@@ -19,11 +19,11 @@ import { FlexModule } from '@angular/flex-layout/flex'
 })
 export class OAuthComponent implements OnInit {
   constructor (private readonly cookieService: CookieService, private readonly userService: UserService, private readonly router: Router, private readonly route: ActivatedRoute, private readonly ngZone: NgZone) { }
-
+  
   ngOnInit (): void {
-    this.userService.oauthLogin(this.parseRedirectUrlParams().access_token).subscribe((profile: any) => {
-      const password = btoa(profile.email.split('').reverse().join(''))
-      this.userService.save({ email: profile.email, password, passwordRepeat: password }).subscribe(() => {
+    this.userService.oauthLogin(this.parseRedirectUrlParams()).subscribe((profile: any) => {
+      const password = btoa(profile.id.split('').reverse().join(''))
+      this.userService.save({ email: profile.email, password, passwordRepeat: password}).subscribe(() => {
         this.login(profile)
       }, () => { this.login(profile) })
     }, (error) => {
@@ -33,7 +33,7 @@ export class OAuthComponent implements OnInit {
   }
 
   login (profile: any) {
-    this.userService.login({ email: profile.email, password: btoa(profile.email.split('').reverse().join('')), oauth: true }).subscribe((authentication) => {
+    this.userService.login({ email: profile.email, password: btoa(profile.id.split('').reverse().join('')), oauth: true }).subscribe((authentication) => {
       const expires = new Date()
       expires.setHours(expires.getHours() + 8)
       this.cookieService.put('token', authentication.token, { expires })
@@ -43,6 +43,7 @@ export class OAuthComponent implements OnInit {
       this.ngZone.run(async () => await this.router.navigate(['/']))
     }, (error) => {
       this.invalidateSession(error)
+      this.userService.isLoggedIn.next(false)
       this.ngZone.run(async () => await this.router.navigate(['/login']))
     })
   }

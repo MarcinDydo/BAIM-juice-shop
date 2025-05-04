@@ -125,3 +125,38 @@ na używający podstawień od sequelize które nie sklejają bezpośrednio danyc
 ```
 models.sequelize.query(`SELECT * FROM Products WHERE ((name LIKE ? OR description LIKE ?) AND deletedAt IS NULL) ORDER BY name`,{replacements: [ `%${criteria}%`, `%${criteria}%` ]}) 
 ```
+
+### Oauth access_token spam
+wchodząc pod stronę przez link poniżej jesteśmy w stanie zalogować się access_tokenem wygenerowanym w innej aplikacji.
+```
+https://local3000.owasp-juice.shop#access_token=XXXXXXX&token_type=Bearer&expires_in=3599&scope=email%20openid%20https://www.googleapis.com/auth/userinfo.email&authuser=0&prompt=consent
+```
+Pod spodem javascript bierze sobie te parametry i ma uprawnienia do pobrania z endpointu google "userinfo.email",
+funkcja "oauthLogin" w user.service.ts przekazuje surowego pobranego jsona do obiektu "profile" w klasie "OAuthComponent.ts".
+Następnie hasło ustawiane jest jako BASE64 zakodowany odwrócony email. przykładowo - lp.tset@tset. 
+```
+const password = btoa(profile.email.split('').reverse().join(''))
+```
+Da się zalogować tak przygotowanym hasłem, pomijając Oauth - lepeij użyć w tym celu niepublicznego ID lub całkowicie zmienic schemat tworzenia użytkowników.
+Da się także zalogować za pomocą tokena google wygenerowanego w innej aplikacji
+Aby to uniemożliwić, a także aby wprowadzić weryfikację czy token został zarequestowany przez frontend wcześniej można wprowadzić dodatkową logikę do funkcji oauthLogin w user.service.ts wweryfikującą token i parametr state przekierowania
+```
+oauthLogin (params: any): Observable<any>{
+    const tokenInfoUrl = `https://oauth2.googleapis.com/tokeninfo?access_token=${params.access_token}`;
+    const userInfoUrl  = `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${params.access_token}`;
+
+    return this.http.get<{ aud: string }>(tokenInfoUrl).pipe(
+      switchMap(tokenInfo => {
+        const goodAud   = tokenInfo.aud === clientId;
+        const goodState = params.state === localStorage.getItem('oauthState');
+        if (goodAud && goodState) {
+          return this.http.get(userInfoUrl);
+        } else {
+          return this.whoAmI();
+        }
+      })
+    )
+  }
+```
+
+

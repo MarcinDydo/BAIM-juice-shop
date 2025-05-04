@@ -118,6 +118,18 @@ export class LoginComponent implements OnInit {
   }
 
   googleLogin () {
-    this.windowRefService.nativeWindow.location.replace(`${oauthProviderUrl}?client_id=${this.clientId}&response_type=token&scope=email&redirect_uri=${this.redirectUri}`)
+    const state = Math.random().toString(36).substring(2)
+    localStorage.setItem('oauthState', state)
+    console.warn('State: ' + state)
+    const params = new URLSearchParams(
+      {
+        client_id: this.clientId,
+        response_type: 'token',
+        scope: 'email',
+        redirect_uri: this.redirectUri,
+        state: state
+      }
+    )
+    this.windowRefService.nativeWindow.location.replace(`${oauthProviderUrl}?${params}`)
   }
 }
