@@ -49,7 +49,29 @@ export function servePublicFiles () {
     })
   }
 
-  function endsWithAllowlistedFileType (param: string) {
-    return utils.endsWith(param, '.md') || utils.endsWith(param, '.pdf')
+  function endsWithAllowlistedFileType(param: string): boolean {
+    let decoded = param;
+    try {
+      let prev: string;
+      // keep decoding until nothing changes (handles %2500 → %00 → \0)
+      do {
+        prev    = decoded;
+        decoded = decodeURIComponent(decoded);
+      } while (decoded !== prev);
+    } catch {
+      // malformed encoding
+      return false;
+    }
+
+    // 2) Reject any null bytes
+    if (decoded.includes('\0')) {
+      return false;
+    }
+
+    // 3) Extract extension
+    const ext = path.extname(decoded).toLowerCase();
+
+    // 4) Whitelist
+    return ext === '.md' || ext === '.pdf';
   }
 }

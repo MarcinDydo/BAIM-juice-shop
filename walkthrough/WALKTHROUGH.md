@@ -160,3 +160,42 @@ oauthLogin (params: any): Observable<any>{
 ```
 
 
+### SQL injection w login page 
+login page pozwala zalogować się na admina  przy użyiu payloadu:
+```
+' or 1=1;--
+```
+
+wynika to z konkatenacji łańcóchów znaków do query bez sanityzacji. Wystarczy w tym celu wykorzystać podstawienia:
+```
+
+models.sequelize.query(`SELECT * FROM Users WHERE email = ? AND password = ? AND deletedAt IS NULL`, { model: UserModel, plain: true , replacements: [ `%${req.body.email}%`, `%${security.hash(req.body.password)}%` ]})
+```
+
+### zatrucie NULL byte pozwala na pobranie tajnego pliku
+przechodząc pod url: 
+```
+http://ip:port/ftp/coupons_2013.md.bak%2500.md
+```
+można pobrac plik .bak
+problemem jest funkcja endsWithAllowlistedFileType w fileServer.ts która nie zawiera odpowiedenigo pełnego dekodowania.
+poprawka kodu: 
+```
+let decoded = param;
+    try {
+      let prev: string;
+      do {
+        prev    = decoded;
+        decoded = decodeURIComponent(decoded);
+      } while (decoded !== prev);
+    } catch {
+      return false;
+    }
+    if (decoded.includes('\0')) {
+      return false;
+    }
+```
+
+![dzięki poprawce próba przeprowadzenia ataku kończy się błedem](image-7.png)
+
+###
